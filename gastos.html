@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meus Gastos - Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Link para o arquivo style.css externo (para estilos personalizados) -->
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Estilos base para garantir a fonte e o fundo */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f2f5; /* Cor de fundo suave */
+    }
+    /* Estilo para a caixa de dados de gastos */
+    .caixa-dados-item {
+      @apply bg-white p-4 rounded-lg shadow-sm mb-2 flex justify-between items-center;
+    }
+    .caixa-dados-item strong {
+      @apply text-gray-800;
+    }
+    .caixa-dados-item span {
+      @apply text-gray-600 font-medium;
+    }
+
+    /* Estilo da Caixa de Mensagens (replicado aqui para garantir que funciona se style.css não carregar) */
+    .message-box {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 1rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 500;
+        z-index: 1000;
+        display: none; /* Hidden by default */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        animation: fadeIn 0.3s ease-out;
+    }
+    .message-box.success {
+        background-color: #d1fae5; /* Green 100 */
+        color: #065f46; /* Green 800 */
+        border: 1px solid #34d399; /* Green 400 */
+    }
+    .message-box.error {
+        background-color: #fee2e2; /* Red 100 */
+        color: #991b1b; /* Red 800 */
+        border: 1px solid #ef4444; /* Red 400 */
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateX(-50%) translateY(0); }
+        to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center py-8">
+
+  <div class="container bg-white rounded-xl shadow-lg p-6 md:p-8 w-full max-w-4xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold text-gray-800">Meus Gastos</h1>
+      <button id="logout" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">Sair</button>
+    </div>
+
+    <!-- Seção de Resumo de Gastos -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-blue-100 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold text-blue-800 mb-2">Total de Gastos (Mês Atual)</h2>
+        <p id="totalGastosMes" class="text-4xl font-bold text-blue-700">R$ 0,00</p>
+      </div>
+      <div class="bg-green-100 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold text-green-800 mb-2">Próximas Contas a Receber</h2>
+        <ul id="proximasReceber" class="text-lg text-green-700">
+          <!-- Itens serão carregados aqui -->
+          <li class="italic text-gray-500">Nenhuma conta a receber próxima.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Seção de Adicionar Novo Gasto -->
+    <div class="bg-gray-50 p-6 rounded-lg shadow-md mb-8">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Adicionar Novo Gasto</h2>
+      <form id="gastoForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <input type="text" id="descricao" placeholder="Descrição do Gasto" required
+               class="col-span-full md:col-span-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input type="number" step="0.01" id="valor" placeholder="Valor (R$)" required
+               class="col-span-full md:col-span-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="submit"
+                class="col-span-full md:col-span-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition duration-300 ease-in-out">
+          Adicionar Gasto
+        </button>
+      </form>
+    </div>
+
+    <!-- Seção de Lista de Gastos -->
+    <div class="bg-gray-50 p-6 rounded-lg shadow-md">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Meus Gastos Detalhados</h2>
+      <div id="listaGastos" class="space-y-2">
+        <!-- Gastos serão carregados aqui -->
+        <p class="text-gray-500 italic">Nenhum gasto registrado ainda.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message Box Element -->
+  <div id="messageBox" class="message-box"></div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) window.location.href = 'index.html';
+
+    const listaGastos = document.getElementById('listaGastos');
+    const gastoForm = document.getElementById('gastoForm'); // Renomeado para evitar conflito com 'form' global
+    const totalGastosMes = document.getElementById('totalGastosMes');
+    const proximasReceber = document.getElementById('proximasReceber');
+
+    // Função para exibir mensagens personalizadas
+    function showMessage(message, type) {
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = message;
+        messageBox.className = `message-box ${type}`; // Add type class (success or error)
+        messageBox.style.display = 'block'; // Show the message box
+
+        // Hide the message after 3 seconds
+        setTimeout(() => {
+            messageBox.style.animation = 'fadeOut 0.3s ease-out forwards';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+                messageBox.style.animation = ''; // Reset animation
+            }, 300);
+        }, 3000);
+    }
+
+    // Função para carregar e exibir os gastos
+    async function carregarGastos() {
+      try {
+        // Carregar gastos do mês atual
+        const dataAtual = new Date();
+        const mesAtual = dataAtual.getMonth() + 1; // Mês é 0-indexado
+        const anoAtual = dataAtual.getFullYear();
+
+        const resGastos = await fetch(`/gastos?mes=${mesAtual}&ano=${anoAtual}`, {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        const gastos = await resGastos.json();
+        
+        listaGastos.innerHTML = ''; // Limpa a lista antes de adicionar
+        let totalMes = 0;
+
+        if (gastos.length === 0) {
+          listaGastos.innerHTML = '<p class="text-gray-500 italic">Nenhum gasto registrado ainda.</p>';
+        } else {
+          gastos.forEach(gasto => {
+            const div = document.createElement('div');
+            div.className = 'caixa-dados-item'; // Aplica classes Tailwind para estilo
+            div.innerHTML = `
+              <div>
+                <strong>${gasto.descricao}</strong><br>
+                <span class="text-sm text-gray-500">Data: ${new Date(gasto.data).toLocaleDateString('pt-BR')}</span>
+              </div>
+              <span>R$ ${parseFloat(gasto.valor).toFixed(2).replace('.', ',')}</span>
+            `;
+            listaGastos.appendChild(div);
+            totalMes += parseFloat(gasto.valor);
+          });
+        }
+        totalGastosMes.textContent = `R$ ${totalMes.toFixed(2).replace('.', ',')}`;
+
+        // Carregar próximas contas a receber (se a rota estiver implementada no backend)
+        const resReceber = await fetch(`/proximas-receber`, {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        const proximas = await resReceber.json();
+
+        proximasReceber.innerHTML = '';
+        if (proximas.length === 0) {
+          proximasReceber.innerHTML = '<li class="italic text-gray-500">Nenhuma conta a receber próxima.</li>';
+        } else {
+          proximas.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'flex justify-between items-center py-1';
+            li.innerHTML = `
+              <span>${item.descricao}</span>
+              <span class="font-bold">R$ ${parseFloat(item.valor).toFixed(2).replace('.', ',')}</span>
+            `;
+            proximasReceber.appendChild(li);
+          });
+        }
+
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        showMessage('Erro ao carregar dados. Verifique sua conexão ou faça login novamente.', 'error');
+      }
+    }
+
+    // Adicionar novo gasto
+    gastoForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const descricao = document.getElementById('descricao').value.trim();
+      const valor = parseFloat(document.getElementById('valor').value);
+
+      if (!descricao || isNaN(valor) || valor <= 0) {
+        showMessage('Por favor, insira uma descrição válida e um valor maior que zero.', 'error');
+        return;
+      }
+
+      const dataAtual = new Date();
+      const mes = dataAtual.getMonth() + 1; // Mês é 0-indexado
+      const ano = dataAtual.getFullYear();
+
+      try {
+        const res = await fetch('/gastos', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + token},
+          body: JSON.stringify({ descricao, valor, mes, ano })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showMessage('Gasto adicionado com sucesso!', 'success');
+          gastoForm.reset(); // Limpa o formulário
+          carregarGastos(); // Recarrega a lista de gastos
+        } else {
+          const errorData = await res.json();
+          showMessage(errorData.error || 'Erro ao adicionar gasto. Tente novamente.', 'error');
+        }
+      } catch (error) {
+        console.error('Erro ao adicionar gasto:', error);
+        showMessage('Não foi possível adicionar o gasto. Verifique sua conexão ou tente novamente.', 'error');
+      }
+    });
+
+    // Logout
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      window.location.href = 'index.html';
+    });
+
+    // Carregar dados ao iniciar a página
+    carregarGastos();
+  </script>
+</body>
+</html>
